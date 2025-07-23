@@ -1,0 +1,67 @@
+import logging
+import os
+
+from subtitles.style_options import get_subtitle_style
+from subtitles.subtitles_create import generate_subtitles
+from subtitles.subtitles_to_video import add_subtitles_to_video
+from video_data_paths import get_paths
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def process_video_with_subtitles(
+    input_video: str,
+    output_video: str | None = None,
+    model_size: str = "large",
+    # model_size: str = "small",
+    language: str = "ru",
+    hardcode: bool = True,
+    keep_srt: bool = False,
+    subtitle_style: str = None,
+):
+    """
+    Complete pipeline: transcribe audio and embed subtitles into video.
+    """
+
+    audio_path, srt_path, output_video_path = get_paths(input_video)
+
+    if output_video is None:
+        output_video = output_video_path
+
+    temp_srt = srt_path
+    folder_path = os.path.dirname(temp_srt)
+
+    if folder_path and not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    # 1. Generate subtitles
+    if not generate_subtitles(input_video, temp_srt, model_size, language):
+        return
+
+    if subtitle_style is None:
+        subtitle_style = get_subtitle_style()
+
+    # 2. Add subtitles to video
+    success = add_subtitles_to_video(
+        input_video=input_video,
+        input_srt=temp_srt,
+        output_video=output_video,
+        hardcode=hardcode,
+        subtitle_style=subtitle_style,
+    )
+
+    # 3. Cleanup
+    if success:
+        logger.info(f"✅ Success: Subtitled video saved to {output_video}")
+    # if not keep_srt and os.path.exists(temp_srt):
+    #     os.remove(temp_srt)
+    #     logger.info(f"Temp subtitles file removed.")
+
+
+if __name__ == "__main__":
+    process_video_with_subtitles("video_data/video.mp4")

@@ -1,0 +1,6 @@
+pydub==0.25.1
+httpx==0.28.1
+
+faster-whisper==1.1.1
+
+pysrt==1.1.2
