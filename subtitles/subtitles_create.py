@@ -7,7 +7,6 @@ from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
 from subtitles.subtitles_change import process_srt_file
-
 from video_data_paths import get_paths
 
 logger = logging.getLogger(__name__)
@@ -99,7 +98,7 @@ def generate_subtitles(
         # Save subtitles
         subs.save(output_srt, encoding="utf-8")
         process_srt_file(output_srt, output_srt, max_gap=2.0)
-        logger.info(f"Subtitles file updated.")
+        logger.info(f"Subtitles file updated")
         return True
 
     except Exception as e:
@@ -109,4 +108,4 @@ def generate_subtitles(
         # Cleanup temporary files
         if os.path.exists(temp_audio):
             os.remove(temp_audio)
-            logger.info(f"Temp audio file removed.")
+            logger.info(f"Temp audio file removed")

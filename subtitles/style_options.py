@@ -1,6 +1,5 @@
 def get_subtitle_style(
-    # font: str = "Arial",
-    font: str = "app_subtitles/fonts/IBMPlexSans-SemiBold.ttf",
+    font: str = "Arial",
     fontsize: int = 18,
     primary_colour: str = "&HFFFFFF",  # Main text color (white)
     secondary_colour: str = "&HFFFF00",  # Highlight color (yellow)
@@ -20,8 +19,7 @@ def get_subtitle_style(
     alignment: int = 2,  # Alignment (1-9, 2=center)
     marginl: int = 10,  # Left margin (pixels)
     marginr: int = 10,  # Right margin (pixels)
-    # marginv: int = 145,  # Vertical margin (pixels)
-    marginv: int = 160,  # Vertical margin (pixels)
+    marginv: int = 10,  # Vertical margin (pixels)
 ):
     subtitle_style = (
         f"Fontname={font},"

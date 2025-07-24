@@ -17,25 +17,26 @@ logger = logging.getLogger(__name__)
 def process_video_with_subtitles(
     input_video: str,
     output_video: str | None = None,
-    model_size: str = "large",
-    # model_size: str = "small",
     language: str = "ru",
     hardcode: bool = True,
+    font: str = "app_subtitles/fonts/IBMPlexSans-SemiBold.ttf",
+    fontsize: int = 18,
+    font_colour: str = "&HFFFFFF",  # white
+    marginv: int = 10,  # Vertical margin (pixels)
+    model_size: str = "large",  # tiny, base, small, medium, large (large-v2, large-v3)
     keep_srt: bool = False,
-    subtitle_style: str = None,
 ):
     """
     Complete pipeline: transcribe audio and embed subtitles into video.
     """
 
-    audio_path, srt_path, output_video_path = get_paths(input_video)
+    _, srt_path, output_video_path = get_paths(input_video)
 
     if output_video is None:
         output_video = output_video_path
 
     temp_srt = srt_path
     folder_path = os.path.dirname(temp_srt)
-
     if folder_path and not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
@@ -43,8 +44,12 @@ def process_video_with_subtitles(
     if not generate_subtitles(input_video, temp_srt, model_size, language):
         return
 
-    if subtitle_style is None:
-        subtitle_style = get_subtitle_style()
+    subtitle_style = get_subtitle_style(
+        font=font,
+        fontsize=fontsize,
+        primary_colour=font_colour,
+        marginv=marginv,
+    )
 
     # 2. Add subtitles to video
     success = add_subtitles_to_video(
@@ -60,8 +65,16 @@ def process_video_with_subtitles(
         logger.info(f"✅ Success: Subtitled video saved to {output_video}")
     # if not keep_srt and os.path.exists(temp_srt):
     #     os.remove(temp_srt)
-    #     logger.info(f"Temp subtitles file removed.")
+    #     logger.info(f"Temp subtitles file removed")
 
 
 if __name__ == "__main__":
-    process_video_with_subtitles("video_data/video.mp4")
+    process_video_with_subtitles(
+        input_video="video_data/video.mp4",
+        font="app_subtitles/fonts/IBMPlexSans-SemiBold.ttf",
+        fontsize=18,
+        font_colour="&HFFFFFF",
+        # marginv=145,
+        marginv=160,
+        # model_size="small",
+    )
