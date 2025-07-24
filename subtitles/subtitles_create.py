@@ -25,6 +25,7 @@ def generate_subtitles(
 ) -> bool:
     """
     Generates subtitles with configurable word limits and long word handling.
+    Handles punctuation sequences by moving them to previous subtitle when needed.
     """
     try:
         start = time.perf_counter()
@@ -52,10 +53,19 @@ def generate_subtitles(
 
         subs = pysrt.SubRipFile()
         sub_index = 1
+        previous_sub = None  # Store previous subtitle for punctuation handling
 
         # Characters that should force a new subtitle line
         sentence_enders = {".", "!", "?"}
-        # sentence_enders = {".", ",", ":", ";", "!", "?"}
+        # Punctuation sequences that should be moved to previous subtitle
+        move_to_previous_patterns = {
+            '."',
+            '!"',
+            '?"',  # English-style quotes
+            ".»",
+            "!»",
+            "?»",  # Russian-style quotes
+        }
 
         for segment in segments:
             words = list(segment.words)
@@ -108,16 +118,39 @@ def generate_subtitles(
                 # Combine words into subtitle text
                 text = " ".join(word.word for word in word_group).strip()
 
-                # Add subtitle entry
-                subs.append(
-                    pysrt.SubRipItem(
+                # Check if current subtitle starts with a punctuation sequence that should be moved
+                move_text = ""
+                for pattern in move_to_previous_patterns:
+                    if text.startswith(pattern):
+                        move_text = pattern
+                        text = text[len(pattern) :].strip()
+                        # Adjust first_word since we're moving part of the text
+                        if len(word_group) > 1:
+                            first_word = word_group[1]
+                        break
+
+                # If we found punctuation to move and there's a previous subtitle
+                if move_text and previous_sub:
+                    # Append the punctuation to previous subtitle
+                    previous_sub.text = f"{previous_sub.text}{move_text}"
+                    # Extend previous subtitle's end time to include this punctuation
+                    previous_sub.end = pysrt.SubRipTime(
+                        seconds=first_word.start
+                    )
+
+                # Create new subtitle (skip if text became empty after moving punctuation)
+                if text:
+                    new_sub = pysrt.SubRipItem(
                         index=sub_index,
                         start=pysrt.SubRipTime(seconds=first_word.start),
                         end=pysrt.SubRipTime(seconds=last_word.end),
                         text=text,
                     )
-                )
-                sub_index += 1
+                    subs.append(new_sub)
+                    previous_sub = (
+                        new_sub  # Store reference for next iteration
+                    )
+                    sub_index += 1
 
         end = time.perf_counter()
         logger.info(f"Subtitles generated in {end - start:.2f} seconds")
