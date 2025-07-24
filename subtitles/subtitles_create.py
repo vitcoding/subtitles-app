@@ -19,8 +19,9 @@ def generate_subtitles(
     language: str = "ru",
     device: str = "cpu",
     # device: str = "cuda",
-    max_words: int = 2,  # Maximum words per subtitle (default 2)
-    long_word_threshold: int = 12,  # Treat as long word if character count exceeds this
+    max_words: int = 3,  # Default maximum words per subtitle
+    max_chars: int = 20,  # Maximum characters per subtitle line
+    long_word_threshold: int = 20,  # Treat as long word if character count exceeds this
 ) -> bool:
     """
     Generates subtitles with configurable word limits and long word handling.
@@ -37,7 +38,7 @@ def generate_subtitles(
             temp_audio, format="wav", codec="pcm_s16le"
         )
 
-        # Initialize Whisper model with appropriate compute type
+        # Initialize Whisper model
         model = WhisperModel(
             model_size,
             device=device,
@@ -66,22 +67,35 @@ def generate_subtitles(
                     word_group = [words[i]]
                     i += 1
                 else:
-                    # Group words while respecting max_words limit and punctuation rules
+                    # Start with maximum allowed words
+                    current_max_words = max_words
                     word_group = []
-                    while len(word_group) < max_words and i < len(words):
-                        current_word = words[i].word
 
-                        # If previous word ended with sentence-ending punctuation, break the group
+                    # Reduce word count until the line fits character limit
+                    while current_max_words > 0:
+                        candidate_group = words[i : i + current_max_words]
+
+                        # Check punctuation break conditions
                         if word_group and any(
                             word_group[-1].word.endswith(end)
                             for end in sentence_enders
                         ):
                             break
 
-                        if len(current_word) > long_word_threshold:
+                        # Check if candidate group exceeds character limit
+                        candidate_text = " ".join(
+                            w.word for w in candidate_group
+                        ).strip()
+                        if len(candidate_text) <= max_chars:
+                            word_group = candidate_group
+                            i += current_max_words
                             break
 
-                        word_group.append(words[i])
+                        current_max_words -= 1
+
+                    # If no suitable group found (even single word exceeds limit), take first word
+                    if not word_group and i < len(words):
+                        word_group = [words[i]]
                         i += 1
 
                 if not word_group:
