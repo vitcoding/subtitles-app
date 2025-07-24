@@ -27,31 +27,34 @@ def generate_subtitles(
     """
     try:
         start = time.perf_counter()
-        # Extract audio track from video
+        # Extract audio track from video file
         audio = AudioSegment.from_file(video_path)
-
         audio_path, _, _ = get_paths(video_path)
         temp_audio = audio_path
 
-        # Convert to Whisper-optimized audio format
+        # Convert to Whisper-optimized audio format (16kHz mono WAV)
         audio.set_frame_rate(16000).set_channels(1).export(
             temp_audio, format="wav", codec="pcm_s16le"
         )
 
-        # Initialize Whisper model
+        # Initialize Whisper model with appropriate compute type
         model = WhisperModel(
             model_size,
             device=device,
             compute_type="float16" if device == "cuda" else "int8",
         )
 
-        # Transcribe with word-level timestamps
+        # Transcribe audio with word-level timestamps
         segments, _ = model.transcribe(
             temp_audio, language=language, word_timestamps=True
         )
 
         subs = pysrt.SubRipFile()
         sub_index = 1
+
+        # Characters that should force a new subtitle line
+        sentence_enders = {".", "!", "?"}
+        # sentence_enders = {".", ",", ":", ";", "!", "?"}
 
         for segment in segments:
             words = list(segment.words)
@@ -63,22 +66,32 @@ def generate_subtitles(
                     word_group = [words[i]]
                     i += 1
                 else:
-                    # Take up to max_words (but don't split long phrases)
+                    # Group words while respecting max_words limit and punctuation rules
                     word_group = []
                     while len(word_group) < max_words and i < len(words):
-                        if len(words[i].word) > long_word_threshold:
+                        current_word = words[i].word
+
+                        # If previous word ended with sentence-ending punctuation, break the group
+                        if word_group and any(
+                            word_group[-1].word.endswith(end)
+                            for end in sentence_enders
+                        ):
                             break
+
+                        if len(current_word) > long_word_threshold:
+                            break
+
                         word_group.append(words[i])
                         i += 1
 
                 if not word_group:
                     continue
 
-                # Get timestamps from first/last word
+                # Get timestamps from first and last word in group
                 first_word = word_group[0]
                 last_word = word_group[-1]
 
-                # Combine words into text
+                # Combine words into subtitle text
                 text = " ".join(word.word for word in word_group).strip()
 
                 # Add subtitle entry
@@ -95,7 +108,7 @@ def generate_subtitles(
         end = time.perf_counter()
         logger.info(f"Subtitles generated in {end - start:.2f} seconds")
 
-        # Save subtitles
+        # Save subtitles and apply post-processing
         subs.save(output_srt, encoding="utf-8")
         process_srt_file(output_srt, output_srt, max_gap=2.0)
         logger.info(f"Subtitles file updated")
@@ -105,7 +118,7 @@ def generate_subtitles(
         logger.error(f"❌ Subtitle generation failed: {str(e)}")
         return False
     finally:
-        # Cleanup temporary files
+        # Clean up temporary audio file
         if os.path.exists(temp_audio):
             os.remove(temp_audio)
             logger.info(f"Temp audio file removed")
