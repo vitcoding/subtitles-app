@@ -24,7 +24,7 @@ def process_video_with_subtitles(
     font_colour: str = "&HFFFFFF",  # white
     marginv: int = 10,  # Vertical margin (pixels)
     model_size: str = "large",  # tiny, base, small, medium, large (large-v2, large-v3)
-    keep_srt: bool = False,
+    keep_srt: bool = True,
 ):
     """
     Complete pipeline: transcribe audio and embed subtitles into video.
@@ -63,9 +63,9 @@ def process_video_with_subtitles(
     # 3. Cleanup
     if success:
         logger.info(f"✅ Success: Subtitled video saved to {output_video}")
-    # if not keep_srt and os.path.exists(temp_srt):
-    #     os.remove(temp_srt)
-    #     logger.info(f"Temp subtitles file removed")
+    if not keep_srt and os.path.exists(temp_srt):
+        os.remove(temp_srt)
+        logger.info(f"Temp subtitles file removed")
 
 
 if __name__ == "__main__":
@@ -77,4 +77,5 @@ if __name__ == "__main__":
         # marginv=145,
         marginv=160,
         # model_size="small",
+        # keep_srt=False,
     )
