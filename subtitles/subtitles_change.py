@@ -7,8 +7,10 @@ def process_srt_file(
 ) -> None:
     """
     Process an SRT subtitle file to:
-    1. Make subtitle display continuous (no gaps > max_gap seconds).
-    2. Convert all text to uppercase.
+    1. Make subtitle display continuous (no gaps > max_gap seconds)
+    2. Convert all text to uppercase
+    3. Ensure subtitles don't start exactly at 0 seconds
+    4. Extend previous subtitle when gap is small (< max_gap)
     """
 
     def time_to_ms(time_str: str) -> int:
@@ -47,27 +49,44 @@ def process_srt_file(
 
         return subtitles
 
-    def adjust_gaps(
+    def adjust_subtitles(
         subtitles: List[Tuple[int, int, str]], max_gap_ms: int
     ) -> List[Tuple[int, int, str]]:
-        """Adjust subtitle timings to eliminate gaps larger than max_gap_ms."""
+        """
+        Adjust subtitle timings with the following rules:
+        1. Never start exactly at 0 seconds (use 20ms instead)
+        2. For gaps < max_gap: extend previous subtitle to next start time
+        3. For gaps >= max_gap: keep original timing
+        """
+
         if not subtitles:
             return []
 
-        adjusted = [subtitles[0]]
+        adjusted = []
+
+        # Process first subtitle
+        first_start, first_end, first_text = subtitles[0]
+        # Add 20ms if starting exactly at 0
+        if first_start == 0:
+            first_start = 20
+            # Ensure we don't create invalid timing (end >= start)
+            first_end = max(first_end, first_start)
+        adjusted.append((first_start, first_end, first_text))
 
         for i in range(1, len(subtitles)):
-            prev_end = adjusted[-1][1]
-            curr_start = subtitles[i][0]
+            prev_start, prev_end, prev_text = adjusted[-1]
+            curr_start, curr_end, curr_text = subtitles[i]
+
             gap = curr_start - prev_end
 
-            if 0 < gap <= max_gap_ms:
-                # Adjust to midpoint between subtitles
-                midpoint = prev_end + gap // 2
-                adjusted[-1] = (adjusted[-1][0], midpoint, adjusted[-1][2])
-                adjusted.append((midpoint, subtitles[i][1], subtitles[i][2]))
+            if 0 < gap < max_gap_ms:
+                # Extend previous subtitle to current start time
+                adjusted[-1] = (prev_start, curr_start, prev_text)
+                # Add current subtitle with original end time
+                adjusted.append((curr_start, curr_end, curr_text))
             else:
-                adjusted.append(subtitles[i])
+                # Keep original timing for large gaps or overlaps
+                adjusted.append((curr_start, curr_end, curr_text))
 
         return adjusted
 
@@ -78,7 +97,7 @@ def process_srt_file(
     # Parse and process subtitles
     subtitles = parse_srt(content)
     max_gap_ms = int(max_gap * 1000)  # Convert seconds to milliseconds
-    adjusted_subtitles = adjust_gaps(subtitles, max_gap_ms)
+    adjusted_subtitles = adjust_subtitles(subtitles, max_gap_ms)
 
     # Generate output content
     output_lines = []
