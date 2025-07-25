@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from typing import List, Tuple
 
 import pysrt
 from faster_whisper import WhisperModel
@@ -10,6 +11,36 @@ from subtitles.subtitles_change import process_srt_file
 from video_data_paths import get_paths
 
 logger = logging.getLogger(__name__)
+
+
+def transcribe_audio_with_whisper(
+    audio_path: str,
+    model_size: str = "small",
+    language: str = "ru",
+    device: str = "cpu",
+) -> Tuple[List[dict], dict]:
+    """
+    Transcribes audio using Faster Whisper model.
+    """
+    try:
+        # Initialize Whisper model with appropriate compute type
+        model = WhisperModel(
+            model_size,
+            device=device,
+            compute_type="float16" if device == "cuda" else "int8",
+        )
+
+        # Transcribe audio with word-level timestamps
+        segments, info = model.transcribe(
+            audio_path, language=language, word_timestamps=True
+        )
+
+        # Convert generator to list to ensure we can iterate multiple times
+        return list(segments), info
+
+    except Exception as e:
+        logger.error(f"❌ Whisper transcription failed: {str(e)}")
+        raise
 
 
 def generate_subtitles(
@@ -27,8 +58,10 @@ def generate_subtitles(
     Generates subtitles with configurable word limits and long word handling.
     Handles punctuation sequences by moving them to previous subtitle when needed.
     """
+
     try:
         start = time.perf_counter()
+
         # Extract audio track from video file
         audio = AudioSegment.from_file(video_path)
         audio_path, _, _ = get_paths(video_path)
@@ -39,16 +72,9 @@ def generate_subtitles(
             temp_audio, format="wav", codec="pcm_s16le"
         )
 
-        # Initialize Whisper model
-        model = WhisperModel(
-            model_size,
-            device=device,
-            compute_type="float16" if device == "cuda" else "int8",
-        )
-
-        # Transcribe audio with word-level timestamps
-        segments, _ = model.transcribe(
-            temp_audio, language=language, word_timestamps=True
+        # Transcribe audio using Whisper
+        segments, _ = transcribe_audio_with_whisper(
+            temp_audio, model_size=model_size, language=language, device=device
         )
 
         subs = pysrt.SubRipFile()
@@ -103,7 +129,7 @@ def generate_subtitles(
 
                         current_max_words -= 1
 
-                    # If no suitable group found (even single word exceeds limit), take first word
+                    # If no suitable group found, take first word
                     if not word_group and i < len(words):
                         word_group = [words[i]]
                         i += 1
@@ -133,12 +159,12 @@ def generate_subtitles(
                 if move_text and previous_sub:
                     # Append the punctuation to previous subtitle
                     previous_sub.text = f"{previous_sub.text}{move_text}"
-                    # Extend previous subtitle's end time to include this punctuation
+                    # Extend previous subtitle's end time
                     previous_sub.end = pysrt.SubRipTime(
                         seconds=first_word.start
                     )
 
-                # Create new subtitle (skip if text became empty after moving punctuation)
+                # Create new subtitle if text remains after moving punctuation
                 if text:
                     new_sub = pysrt.SubRipItem(
                         index=sub_index,
@@ -147,9 +173,7 @@ def generate_subtitles(
                         text=text,
                     )
                     subs.append(new_sub)
-                    previous_sub = (
-                        new_sub  # Store reference for next iteration
-                    )
+                    previous_sub = new_sub
                     sub_index += 1
 
         end = time.perf_counter()
@@ -158,7 +182,7 @@ def generate_subtitles(
         # Save subtitles and apply post-processing
         subs.save(output_srt, encoding="utf-8")
         process_srt_file(output_srt, output_srt, max_gap=2.0)
-        logger.info(f"Subtitles file updated")
+        logger.info("Subtitles file updated")
         return True
 
     except Exception as e:
@@ -168,4 +192,4 @@ def generate_subtitles(
         # Clean up temporary audio file
         if os.path.exists(temp_audio):
             os.remove(temp_audio)
-            logger.info(f"Temp audio file removed")
+            logger.info("Temp audio file removed")
