@@ -1,6 +1,6 @@
 # Video Subtitle Processor
 
-This project provides a complete pipeline for adding subtitles to videos, including audio transcription and subtitle embedding.
+This project provides a complete pipeline for adding subtitles to videos, including audio transcription (with local Faster Whisper or OpenAI API) and subtitle embedding.
 
 ## Features
 
@@ -26,6 +26,8 @@ This project provides a complete pipeline for adding subtitles to videos, includ
    ```
    pip install -r requirements.txt
    ```
+3. Create an `.env` file based on the example of `.env.sample`.
+4. Add `OPENAI_API_KEY` to `.env` (for OpenAI API).
 
 ## Usage
 
@@ -37,6 +39,6 @@ This project provides a complete pipeline for adding subtitles to videos, includ
 
 ## Notes
 
-- For best results with speech recognition, use the "large" model size (requires more resources)
-- The processing time depends on video length and model size
-- Output video quality is preserved from the input file
+- For best results with speech recognition with Faster Whisper, use the "large" model size (requires more resources).
+- The processing time depends on video length and model size.
+- Output video quality is preserved from the input file.

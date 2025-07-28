@@ -1,16 +1,18 @@
 import logging
 import os
 import time
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 import pysrt
 from faster_whisper import WhisperModel
 from openai import OpenAI
 from pydub import AudioSegment
 
-from response_mock_temp import response_mock
+from subtitles.process_api_response import add_punctuation_to_words
 from subtitles.subtitles_change import process_srt_file
 from video_data_paths import get_paths
+
+# from response_mock_temp import response_mock
 
 logger = logging.getLogger(__name__)
 
@@ -122,54 +124,20 @@ def _transcribe_with_openai_api(
     # For testing, use mock response
     # response = response_mock
 
-    # Process words with attached punctuation
-    processed_words = []
-    text_chars = list(response.text)
-    word_index = 0
-    char_index = 0
+    # For debugging
+    # logger.info(f"text: {response.text}")
+    # logger.info(f"words: {response.words}")
 
-    while char_index < len(text_chars) and word_index < len(response.words):
-        char = text_chars[char_index]
-
-        if char.isspace():
-            char_index += 1
-            continue
-
-        current_word = response.words[word_index].word
-        text_slice = "".join(
-            text_chars[char_index : char_index + len(current_word)]
+    words_changed = add_punctuation_to_words(response.text, response.words)
+    processed_words = [
+        TranscriptionWord(
+            word=w["word"],
+            start=w["start"],
+            end=w["end"],
         )
-
-        if text_slice.lower() == current_word.lower():
-            # Find all punctuation following this word
-            punctuation = []
-            punct_index = char_index + len(current_word)
-
-            while (
-                punct_index < len(text_chars)
-                and not text_chars[punct_index].isspace()
-                and not text_chars[punct_index].isalnum()
-            ):
-                punctuation.append(text_chars[punct_index])
-                punct_index += 1
-
-            # Create word with attached punctuation but keep original timings
-            full_word = current_word + "".join(punctuation)
-            processed_words.append(
-                TranscriptionWord(
-                    word=full_word,
-                    start=response.words[word_index].start,
-                    end=response.words[
-                        word_index
-                    ].end,  # Keep original end time
-                    type="word",
-                )
-            )
-
-            char_index = punct_index
-            word_index += 1
-        else:
-            char_index += 1
+        for w in words_changed
+    ]
+    logger.info(f"words: {[i.word for i in processed_words]}")
 
     # Return as a single segment to match faster_whisper format
     return [processed_words], {"language": response.language}
@@ -333,7 +301,7 @@ def generate_subtitles(
     except Exception as e:
         logger.error(f"❌ Subtitle generation failed: {str(e)}")
         return False
-    finally:
-        if os.path.exists(temp_audio):
-            os.remove(temp_audio)
-            logger.info("Temp audio file removed")
+    # finally:
+    #     if os.path.exists(temp_audio):
+    #         os.remove(temp_audio)
+    #         logger.info("Temp audio file removed")

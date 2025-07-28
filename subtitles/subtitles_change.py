@@ -11,6 +11,7 @@ def process_srt_file(
     2. Convert all text to uppercase
     3. Ensure subtitles don't start exactly at 0 seconds
     4. Extend previous subtitle when gap is small (< max_gap)
+    5. Remove leading punctuation marks like » and «
     """
 
     def time_to_ms(time_str: str) -> int:
@@ -28,6 +29,12 @@ def process_srt_file(
         s = ms // 1000
         ms %= 1000
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+    def clean_text(text: str) -> str:
+        """Remove leading punctuation marks like » and « from text."""
+        # Remove leading punctuation marks and whitespace
+        cleaned = re.sub(r"^[»\s]+", "", text)
+        return cleaned
 
     def parse_srt(content: str) -> List[Tuple[int, int, str]]:
         """Parse SRT content into list of (start_ms, end_ms, text) tuples."""
@@ -104,7 +111,9 @@ def process_srt_file(
     for i, (start_ms, end_ms, text) in enumerate(adjusted_subtitles, 1):
         output_lines.append(f"{i}")
         output_lines.append(f"{ms_to_time(start_ms)} --> {ms_to_time(end_ms)}")
-        output_lines.append(f"{text.upper()}\n")
+        # Apply text cleaning to remove leading punctuation marks
+        cleaned_text = clean_text(text)
+        output_lines.append(f"{cleaned_text.upper()}\n")
 
     # Write output file
     with open(output_file, "w", encoding="utf-8") as f:

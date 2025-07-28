@@ -7,3 +7,5 @@ __pycache__/
 
 video_data/
 !video_data/video_input_here
+
+*.log
