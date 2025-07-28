@@ -1,10 +1,16 @@
 import logging
 import os
 
+import dotenv
+
 from subtitles.style_options import get_subtitle_style
 from subtitles.subtitles_create import generate_subtitles
 from subtitles.subtitles_to_video import add_subtitles_to_video
 from video_data_paths import get_paths
+
+dotenv.load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TRANSCRIPTION_METHOD = os.getenv("TRANSCRIPTION_METHOD")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -46,10 +52,22 @@ def process_video_with_subtitles(
     if use_genererated_srt:
         if not os.path.exists(temp_srt):
             flag = generate_subtitles(
-                input_video, temp_srt, model_size, language
+                input_video,
+                temp_srt,
+                model_size,
+                language,
+                transcription_method=TRANSCRIPTION_METHOD,
+                openai_api_key=OPENAI_API_KEY,
             )
     else:
-        flag = generate_subtitles(input_video, temp_srt, model_size, language)
+        flag = generate_subtitles(
+            input_video,
+            temp_srt,
+            model_size,
+            language,
+            transcription_method=TRANSCRIPTION_METHOD,
+            openai_api_key=OPENAI_API_KEY,
+        )
 
     if flag:
         subtitle_style = get_subtitle_style(
@@ -82,8 +100,9 @@ if __name__ == "__main__":
         font="app_subtitles/fonts/IBMPlexSans-SemiBold.ttf",
         fontsize=18,
         font_colour="&HFFFFFF",
+        # marginv=15,
         # marginv=145,
-        marginv=160,
+        marginv=160,  # bottom margin
         # model_size="small",
         # keep_srt=False,
         # use_genererated_srt=True,
